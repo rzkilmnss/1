@@ -2,32 +2,52 @@ const axios = require("axios");
 const fs = require("fs");
 const readline = require("readline");
 
-// API URL
+// Konstanta API
 const API_URL = "https://www.aeropres.in/chromeapi/dawn/v1/userreward/claim";
 const LOGIN_URL = "https://www.aeropres.in/chromeapi/dawn/v1/auth/login";
-const WITHDRAW_URL = "https://www.aeropres.in/chromeapi/dawn/v1/withdraw"; // Ubah jika ada URL withdraw
+const WITHDRAW_URL = "https://www.aeropres.in/chromeapi/dawn/v1/withdraw";
+const BALANCE_URL = "https://www.aeropres.in/chromeapi/dawn/v1/user/balance";
 const TOKEN_FILE = "token.json";
 const LOG_FILE = "bot_log.txt";
 
-// Konfigurasi Retry & Delay
+// Konfigurasi
+let sessionToken = "";
 const retryDelay = [1, 2, 4, 8, 16, 32, 60];
 const minDelay = 30;
 const maxDelay = 90;
 const autoWithdraw = true;
 const withdrawThreshold = 1000;
 
-let sessionToken = "";
-let email = "";
-let password = "";
+// Fungsi untuk menampilkan menu
+async function showMenu() {
+    console.clear();
+    console.log(`
+    ██████╗  █████╗ ██╗    ██╗███╗   ██╗███╗   ██╗███╗   ██╗███████╗███████╗
+    ██╔══██╗██╔══██╗██║    ██║████╗  ██║████╗  ██║████╗  ██║██╔════╝██╔════╝
+    ██████╔╝███████║██║ █╗ ██║██╔██╗ ██║██╔██╗ ██║██╔██╗ ██║█████╗  █████╗  
+    ██╔═══╝ ██╔══██║██║███╗██║██║╚██╗██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══╝  
+    ██║     ██║  ██║╚███╔███╔╝██║ ╚████║██║ ╚████║██║ ╚████║███████╗███████╗
+    ╚═╝     ╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚══════╝
+    `);
+    console.log("📌 **Bot By rzkilmnss**");
+    console.log("\n📜 **Menu Pilihan:**");
+    console.log("1️⃣ Start Auto Claim");
+    console.log("2️⃣ Auto Withdraw");
+    console.log("3️⃣ Cek Saldo");
+    console.log("4️⃣ Keluar");
+    console.log("");
 
-// Fungsi Input dari User
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+    const choice = await userInput("Pilih menu (1-4): ");
+    return choice;
+}
 
-function askQuestion(query) {
-    return new Promise(resolve => rl.question(query, resolve));
+// Fungsi untuk membaca input user
+function userInput(question) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise((resolve) => rl.question(question, (answer) => {
+        rl.close();
+        resolve(answer);
+    }));
 }
 
 // Fungsi Simpan Log
@@ -50,11 +70,22 @@ function loadToken() {
     return null;
 }
 
+// Fungsi untuk mendapatkan User-Agent acak
+function getRandomUserAgent() {
+    const userAgents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        "Mozilla/5.0 (Linux; Android 10; SM-G973F)",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_2 like Mac OS X)"
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}
+
 // Fungsi Login
 async function login() {
     logActivity("🔑 Logging in...");
     try {
-        const response = await axios.post(LOGIN_URL, { username: email, password: password });
+        const response = await axios.post(LOGIN_URL, { username: "emailkamu@gmail.com", password: "passwordkamu" });
         sessionToken = response.data.token;
         saveToken(sessionToken);
         logActivity("✅ Login sukses! Token diperbarui.");
@@ -63,7 +94,7 @@ async function login() {
     }
 }
 
-// Fungsi Auto Claim
+// Fungsi Auto Claim dengan Mode Stealth
 async function claimReward(attempt = 0) {
     if (attempt >= retryDelay.length) {
         logActivity("🚨 Gagal klaim setelah banyak percobaan.");
@@ -72,7 +103,12 @@ async function claimReward(attempt = 0) {
 
     logActivity(`🎁 Mencoba klaim reward... (Percobaan ${attempt + 1})`);
     try {
-        const response = await axios.post(API_URL, {}, { headers: { Authorization: `Bearer ${sessionToken}` } });
+        const response = await axios.post(API_URL, {}, {
+            headers: {
+                Authorization: `Bearer ${sessionToken}`,
+                "User-Agent": getRandomUserAgent()
+            }
+        });
         logActivity("✅ Reward berhasil diklaim: " + JSON.stringify(response.data));
 
         if (autoWithdraw) {
@@ -94,7 +130,7 @@ async function claimReward(attempt = 0) {
 // Fungsi Auto Withdraw (Opsional)
 async function withdrawIfNeeded() {
     try {
-        const balanceResponse = await axios.get("https://www.aeropres.in/chromeapi/dawn/v1/user/balance", { headers: { Authorization: `Bearer ${sessionToken}` } });
+        const balanceResponse = await axios.get(BALANCE_URL, { headers: { Authorization: `Bearer ${sessionToken}` } });
         const balance = balanceResponse.data.balance;
 
         logActivity(`💰 Saldo saat ini: ${balance}`);
@@ -109,20 +145,35 @@ async function withdrawIfNeeded() {
     }
 }
 
-// Fungsi Menjalankan Bot
-(async () => {
-    email = await askQuestion("📩 Masukkan Email: ");
-    password = await askQuestion("🔑 Masukkan Password: ");
-    rl.close();
+// Fungsi untuk cek saldo
+async function checkBalance() {
+    try {
+        const response = await axios.get(BALANCE_URL, { headers: { Authorization: `Bearer ${sessionToken}` } });
+        logActivity(`💰 Saldo Anda: ${response.data.balance}`);
+    } catch (error) {
+        logActivity("❌ Gagal cek saldo: " + (error.response?.data || error.message));
+    }
+}
 
+// Jalankan Bot
+(async () => {
     sessionToken = loadToken();
     if (!sessionToken) {
         await login();
     }
 
-    setInterval(() => {
-        let delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-        logActivity(`⏳ Menunggu ${delay} detik sebelum klaim berikutnya...`);
-        setTimeout(() => claimReward(), delay * 1000);
-    }, 60000);
+    while (true) {
+        const menuChoice = await showMenu();
+        if (menuChoice === "1") {
+            logActivity("🚀 Memulai Auto Claim...");
+            setInterval(() => claimReward(), 60000);
+        } else if (menuChoice === "2") {
+            await withdrawIfNeeded();
+        } else if (menuChoice === "3") {
+            await checkBalance();
+        } else if (menuChoice === "4") {
+            console.log("👋 Keluar...");
+            process.exit();
+        }
+    }
 })();
