@@ -1,49 +1,28 @@
-const axios = require("axios");
-const readline = require("readline");
+const axios = require('axios');
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+async function getDawnPoints() {
+    try {
+        const response = await axios.get('https://www.aeropres.in/api/atom/v1/userreferral/getpoint?appid=678f02e10d5de18f98ffbe8e2c', {
+            headers: {
+                'Accept': '*/*',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.7,en;q=0.6',
+                'Authorization': 'Bearer 260b27bd0a3eb2b6d2fd430c797a0da7f6127fa1261f54b618ca30d7951749169b87450874057',
+                'Content-Type': 'application/json',
+                'Sec-Ch-Ua': '"Not A;Brand";v="8", "Chromium";v="121"',
+                'Sec-Ch-Ua-Mobile': '?1',
+                'Sec-Ch-Ua-Platform': '"Android"',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'cross-site'
+            }
+        });
 
-rl.question("Masukkan Bearer Token: ", async (token) => {
-    rl.close();
-
-    const headers = { Authorization: `Bearer ${token}` };
-
-    async function getPoints() {
-        try {
-            const res = await axios.get("https://api.dawn.com/points", { headers });
-            return res.data.total_points;
-        } catch (err) {
-            console.error("Gagal mengambil poin:", err.response ? err.response.data : err.message);
-            return null;
-        }
+        console.log('Data Points:', response.data);
+    } catch (error) {
+        console.error('Error:', error.response ? error.response.data : error.message);
     }
+}
 
-    async function claimReward() {
-        try {
-            const res = await axios.post("https://api.dawn.com/claim", {}, { headers });
-            console.log("✅ Klaim sukses:", res.data.message);
-        } catch (err) {
-            console.error("❌ Klaim gagal:", err.response ? err.response.data : err.message);
-        }
-    }
-
-    console.log("\n🔄 Mengambil total poin...");
-    const initialPoints = await getPoints();
-    if (initialPoints !== null) {
-        console.log(`💰 Total Poin Sebelum Klaim: ${initialPoints}`);
-    }
-
-    console.log("\n⚡ Memulai auto claim...");
-    await claimReward();
-
-    console.log("\n🔄 Memeriksa total poin terbaru...");
-    const finalPoints = await getPoints();
-    if (finalPoints !== null) {
-        console.log(`🎉 Total Poin Setelah Klaim: ${finalPoints}`);
-    }
-
-    console.log("\n✅ Bot selesai!");
-});
+// Jalankan fungsi
+getDawnPoints();
