@@ -1,23 +1,34 @@
 const axios = require("axios");
 const fs = require("fs");
+const readline = require("readline");
 
-// Konstanta
+// API URL
 const API_URL = "https://www.aeropres.in/chromeapi/dawn/v1/userreward/claim";
 const LOGIN_URL = "https://www.aeropres.in/chromeapi/dawn/v1/auth/login";
-const WITHDRAW_URL = "https://www.aeropres.in/chromeapi/dawn/v1/withdraw"; // Ganti dengan URL withdraw jika ada
-const USERNAME = "emailkamu@gmail.com"; // Ganti dengan email login Dawn
-const PASSWORD = "passwordkamu"; // Ganti dengan password login Dawn
-const TOKEN_FILE = "token.json"; // Simpan token untuk auto-login
-const LOG_FILE = "bot_log.txt"; // Simpan log aktivitas
+const WITHDRAW_URL = "https://www.aeropres.in/chromeapi/dawn/v1/withdraw"; // Ubah jika ada URL withdraw
+const TOKEN_FILE = "token.json";
+const LOG_FILE = "bot_log.txt";
 
 // Konfigurasi Retry & Delay
-const retryDelay = [1, 2, 4, 8, 16, 32, 60]; // Retry dengan backoff
-const minDelay = 30; // Minimal delay (detik)
-const maxDelay = 90; // Maksimal delay (detik)
-const autoWithdraw = true; // Ubah ke false jika tidak ingin auto withdraw
-const withdrawThreshold = 1000; // Ganti dengan jumlah minimal untuk withdraw
+const retryDelay = [1, 2, 4, 8, 16, 32, 60];
+const minDelay = 30;
+const maxDelay = 90;
+const autoWithdraw = true;
+const withdrawThreshold = 1000;
 
 let sessionToken = "";
+let email = "";
+let password = "";
+
+// Fungsi Input dari User
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+function askQuestion(query) {
+    return new Promise(resolve => rl.question(query, resolve));
+}
 
 // Fungsi Simpan Log
 function logActivity(message) {
@@ -43,7 +54,7 @@ function loadToken() {
 async function login() {
     logActivity("🔑 Logging in...");
     try {
-        const response = await axios.post(LOGIN_URL, { username: USERNAME, password: PASSWORD });
+        const response = await axios.post(LOGIN_URL, { username: email, password: password });
         sessionToken = response.data.token;
         saveToken(sessionToken);
         logActivity("✅ Login sukses! Token diperbarui.");
@@ -52,7 +63,7 @@ async function login() {
     }
 }
 
-// Fungsi Auto Claim dengan Auto Retry
+// Fungsi Auto Claim
 async function claimReward(attempt = 0) {
     if (attempt >= retryDelay.length) {
         logActivity("🚨 Gagal klaim setelah banyak percobaan.");
@@ -98,8 +109,12 @@ async function withdrawIfNeeded() {
     }
 }
 
-// Jalankan Bot
+// Fungsi Menjalankan Bot
 (async () => {
+    email = await askQuestion("📩 Masukkan Email: ");
+    password = await askQuestion("🔑 Masukkan Password: ");
+    rl.close();
+
     sessionToken = loadToken();
     if (!sessionToken) {
         await login();
@@ -109,5 +124,5 @@ async function withdrawIfNeeded() {
         let delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
         logActivity(`⏳ Menunggu ${delay} detik sebelum klaim berikutnya...`);
         setTimeout(() => claimReward(), delay * 1000);
-    }, 60000); // Looping setiap 1 menit untuk reconnect
+    }, 60000);
 })();
