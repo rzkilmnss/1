@@ -1,64 +1,74 @@
 const axios = require('axios');
 const readline = require('readline');
+const fs = require('fs');
 
-// Membuat interface untuk input terminal
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+// Fungsi untuk membaca akun dari file accounts.txt
+function readAccounts() {
+    const accounts = fs.readFileSync('accounts.txt', 'utf-8').trim().split('\n');
+    return accounts.map(line => {
+        const [email, token] = line.split(':');
+        return { email, token };
+    });
+}
 
-// Fungsi untuk mendapatkan total poin
-async function getTotalPoints(token) {
+// Fungsi mengambil total poin
+async function getPoints(email, token) {
     try {
-        const response = await axios.get('https://www.aeropres.in/api/atom/v1/userreferral/getpoint', {
+        const response = await axios.get('https://api.dawn.org/points', {
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 9)',
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': 'https://www.aeropres.in/',
-                'Origin': 'https://www.aeropres.in'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
             }
         });
-
-        return response.data.total_points || 'Tidak diketahui';
+        return response.data.points || 0;
     } catch (error) {
-        console.log(`❌ Gagal mengambil poin: ${error.response ? error.response.status : error.message}`);
-        return 'Error';
+        console.log(`❌ Gagal mengambil poin untuk ${email}: ${error.response?.status || error.message}`);
+        return null;
     }
 }
 
-// Fungsi untuk menjalankan auto mining (dummy function)
-async function startAutoMining(token) {
-    console.log('⚡ Bot auto mining dimulai...');
+// Fungsi untuk mining
+async function mine(email, token) {
+    try {
+        const response = await axios.post('https://api.dawn.org/mine', {}, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+            }
+        });
+        console.log(`✔️ Mining berhasil untuk ${email}`);
+        return true;
+    } catch (error) {
+        console.log(`❌ Gagal mining untuk ${email}: ${error.response?.status || error.message}`);
+        return false;
+    }
+}
+
+// Fungsi utama
+async function main() {
+    console.log("⚡ Bot auto mining dimulai...");
+
+    const accounts = readAccounts();
 
     while (true) {
-        try {
-            const response = await axios.post('https://www.aeropres.in/api/atom/v1/mining/start', {}, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'User-Agent': 'Mozilla/5.0 (Linux; Android 9)',
-                    'Accept': 'application/json, text/plain, */*',
-                    'Referer': 'https://www.aeropres.in/',
-                    'Origin': 'https://www.aeropres.in'
-                }
-            });
+        for (const { email, token } of accounts) {
+            const points = await getPoints(email, token);
+            if (points !== null) {
+                console.log(`💰 Total Poin untuk ${email}: ${points}`);
+            }
 
-            console.log(`✅ Mining berhasil!`);
-        } catch (error) {
-            console.log(`❌ Gagal mining: ${error.response ? error.response.status : error.message}`);
+            const success = await mine(email, token);
+            if (!success) {
+                console.log(`❌ Mining gagal untuk ${email}, akan dicoba lagi nanti.`);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (30000 - 10000 + 1) + 10000))); // Delay random 10-30 detik
         }
 
-        console.log('⏳ Menunggu sebelum mining berikutnya...');
-        await new Promise(resolve => setTimeout(resolve, 60000)); // Delay 60 detik
+        console.log("⏳ Menunggu sebelum siklus berikutnya...");
+        await new Promise(resolve => setTimeout(resolve, 500000)); // Delay 500 detik sebelum ulang mining
     }
 }
 
-// Mulai program dengan meminta input token
-rl.question('🔑 Masukkan token Bearer: ', async (token) => {
-    console.log('🔍 Mengambil total poin...');
-    const points = await getTotalPoints(token);
-    console.log(`💰 Total Poin: ${points}`);
-
-    // Memulai auto mining
-    await startAutoMining(token);
-});
+// Jalankan bot
+main();
