@@ -1,76 +1,109 @@
 const axios = require("axios");
-const readline = require("readline-sync");
+const fs = require("fs");
+const readline = require("readline");
+const chalk = require("chalk");
 
-const LOGIN_URL = "https://www.aeropres.in/chromeapi/dawn/v1/auth/login";
-let sessionToken = "";
+// Konstanta API
+const API_CLAIM = "https://www.aeropres.in/chromeapi/dawn/v1/userreward/claim";
+const TOKEN_FILE = "token.json"; // File untuk menyimpan token
+const LOG_FILE = "bot_log.txt"; // File untuk menyimpan log aktivitas
 
-// Fungsi untuk teks berwarna putih
-function putih(teks) {
-    return `\x1b[37m${teks}\x1b[0m`;
+// Fungsi untuk membaca input dari user
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true
+});
+
+// Fungsi untuk menyimpan token ke file
+function saveToken(token) {
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify({ token }));
 }
 
-// Fungsi untuk menampilkan menu utama
-function showMenu() {
-    console.clear();
-    console.log(putih(`
-    ██████╗ ███████╗██╗  ██╗██╗███╗   ███╗███╗   ██╗██╗   ██╗███████╗███████╗
-    ██╔══██╗██╔════╝██║  ██║██║████╗ ████║████╗  ██║██║   ██║██╔════╝██╔════╝
-    ██║  ██║█████╗  ███████║██║██╔████╔██║██╔██╗ ██║██║   ██║███████╗█████╗  
-    ██║  ██║██╔══╝  ██╔══██║██║██║╚██╔╝██║██║╚██╗██║╚██╗ ██╔╝╚════██║██╔══╝  
-    ██████╔╝███████╗██║  ██║██║██║ ╚═╝ ██║██║ ╚████║ ╚████╔╝ ███████║███████╗
-    ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝╚═╝     ╚═╝╚═╝  ╚═══╝  ╚═══╝  ╚══════╝╚══════╝
-    
-    📌 Bot By rzkilmnss
-    `));
-
-    console.log(putih(`
-    📜 MENU PILIHAN:
-    1️⃣ Start Auto Claim
-    2️⃣ Keluar
-    `));
+// Fungsi untuk memuat token dari file
+function loadToken() {
+    if (fs.existsSync(TOKEN_FILE)) {
+        return JSON.parse(fs.readFileSync(TOKEN_FILE, "utf8")).token;
+    }
+    return null;
 }
 
-// Fungsi Login
-async function login() {
-    console.log(putih("📧 Masukkan Email:"));
-    const email = readline.question(putih("> "));
+// Fungsi untuk mencatat log aktivitas
+function logActivity(message) {
+    const logMessage = `[${new Date().toLocaleString()}] ${message}\n`;
+    fs.appendFileSync(LOG_FILE, logMessage);
+    console.log(message);
+}
 
-    console.log(putih("🔒 Masukkan Password:"));
-    const password = readline.question(putih("> "), { hideEchoBack: true });
+// Fungsi untuk klaim reward
+async function claimReward() {
+    let sessionToken = loadToken();
+    if (!sessionToken) {
+        console.log(chalk.red("❌ Token tidak ditemukan! Masukkan token terlebih dahulu."));
+        return showMenu();
+    }
 
-    console.log(putih("🔑 Sedang login..."));
-
+    console.log(chalk.white("🎁 Mencoba klaim reward..."));
     try {
-        const response = await axios.post(LOGIN_URL, { username: email, password: password }, {
-            headers: {
-                "User-Agent": "Mozilla/5.0",
-                "Content-Type": "application/json"
-            }
+        const response = await axios.post(API_CLAIM, {}, {
+            headers: { Authorization: `Bearer ${sessionToken}` }
         });
 
-        sessionToken = response.data.token;
-        console.log(putih("\n✅ Login sukses!\n"));
-        return true;
+        logActivity(chalk.green("✅ Reward berhasil diklaim: " + JSON.stringify(response.data)));
     } catch (error) {
-        console.log(putih(`❌ Login gagal! ${error.response?.data?.message || error.message}\n`));
-        return false;
+        if (error.response?.status === 401) {
+            console.log(chalk.red("⚠️ Token expired! Silakan masukkan token baru."));
+            return inputToken();
+        }
+
+        logActivity(chalk.red("❌ Gagal klaim: " + (error.response?.data || error.message)));
     }
+
+    setTimeout(claimReward, 60000); // Ulangi klaim setiap 60 detik
 }
 
-// Jalankan Program
-(async () => {
-    showMenu();
-    const pilihan = readline.question(putih("Pilih menu (1-2): "));
+// Fungsi untuk input token manual
+function inputToken() {
+    rl.question(chalk.white("🔑 Masukkan Token Bearer: "), (token) => {
+        saveToken(token);
+        console.log(chalk.green("✅ Token disimpan!"));
+        showMenu();
+    });
+}
 
-    if (pilihan === "1") {
-        const isLoggedIn = await login();
-        if (isLoggedIn) {
-            console.log(putih("🚀 Mulai auto claim...\n"));
+// Fungsi untuk menampilkan menu
+function showMenu() {
+    console.clear();
+    console.log(chalk.white(`
+██████╗ ███████╗██╗  ██╗██╗███╗   ███╗███╗   ██╗███╗   ██╗███████╗███████╗
+██╔══██╗██╔════╝██║  ██║██║████╗ ████║████╗  ██║████╗  ██║██╔════╝██╔════╝
+██║  ██║█████╗  ███████║██║██╔████╔██║██╔██╗ ██║██╔██╗ ██║███████╗█████╗  
+██║  ██║██╔══╝  ██╔══██║██║██║╚██╔╝██║██║╚██╗██║██║╚██╗██║╚════██║██╔══╝  
+██████╔╝███████╗██║  ██║██║██║ ╚═╝ ██║██║ ╚████║██║ ╚████║███████║███████╗
+╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚══════╝
+
+📌 Bot By rzkilmnss
+📜 Pilih Menu:
+1️⃣ Start Auto Claim
+2️⃣ Input/Edit Token
+3️⃣ Keluar
+`));
+
+    rl.question(chalk.white("Pilih menu (1-3): "), (choice) => {
+        if (choice === "1") {
+            claimReward();
+        } else if (choice === "2") {
+            inputToken();
+        } else if (choice === "3") {
+            console.log(chalk.white("👋 Keluar..."));
+            rl.close();
+            process.exit();
         } else {
-            console.log(putih("⚠️ Bot berhenti karena login gagal.\n"));
+            console.log(chalk.red("❌ Pilihan tidak valid!"));
+            showMenu();
         }
-    } else {
-        console.log(putih("👋 Keluar..."));
-        process.exit();
-    }
-})();
+    });
+}
+
+// Jalankan Menu Awal
+showMenu();
