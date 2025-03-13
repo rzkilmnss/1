@@ -1,71 +1,64 @@
 const axios = require('axios');
-const fs = require('fs');
-const readline = require('readline-sync');
+const readline = require('readline');
 
-// Input token
-const token = readline.question("Masukkan Token Bearer: ");
-
-// Fungsi untuk mencatat log
-function logActivity(message) {
-    const logMessage = `[${new Date().toLocaleString()}] ${message}\n`;
-    fs.appendFileSync('log.txt', logMessage);
-}
+// Membuat interface untuk input terminal
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
 
 // Fungsi untuk mendapatkan total poin
-async function getTotalPoints() {
+async function getTotalPoints(token) {
     try {
         const response = await axios.get('https://www.aeropres.in/api/atom/v1/userreferral/getpoint', {
             headers: {
-                'Authorization': token,
-                'User-Agent': 'Mozilla/5.0 (Android 9; Mobile)',
+                'Authorization': `Bearer ${token}`,
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 9)',
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': 'https://www.aeropres.in/',
+                'Origin': 'https://www.aeropres.in'
             }
         });
 
-        if (response.data.success) {
-            return response.data.data.total_points || 0;
-        } else {
-            return "Gagal mengambil poin!";
-        }
+        return response.data.total_points || 'Tidak diketahui';
     } catch (error) {
-        return `Error: ${error.message}`;
+        console.log(`❌ Gagal mengambil poin: ${error.response ? error.response.status : error.message}`);
+        return 'Error';
     }
 }
 
-// Fungsi untuk memulai mining
-async function startMining() {
-    console.log("\n⚡ Bot auto mining dimulai...\n");
+// Fungsi untuk menjalankan auto mining (dummy function)
+async function startAutoMining(token) {
+    console.log('⚡ Bot auto mining dimulai...');
 
     while (true) {
         try {
-            // Cek total poin sebelum mining
-            const totalPoints = await getTotalPoints();
-            console.log(`💰 Total Poin: ${totalPoints}`);
-            logActivity(`Total Poin: ${totalPoints}`);
-
-            // Proses mining (misalnya dengan API yang sesuai)
-            const response = await axios.get('https://www.aeropres.in/api/atom/v1/userreferral/getpoint', {
+            const response = await axios.post('https://www.aeropres.in/api/atom/v1/mining/start', {}, {
                 headers: {
-                    'Authorization': token,
-                    'User-Agent': 'Mozilla/5.0 (Android 9; Mobile)',
+                    'Authorization': `Bearer ${token}`,
+                    'User-Agent': 'Mozilla/5.0 (Linux; Android 9)',
+                    'Accept': 'application/json, text/plain, */*',
+                    'Referer': 'https://www.aeropres.in/',
+                    'Origin': 'https://www.aeropres.in'
                 }
             });
 
-            if (response.data.success) {
-                console.log(`✅ Mining sukses!`);
-                logActivity("Mining sukses!");
-            } else {
-                console.log(`❌ Gagal mining: ${response.data.message}`);
-                logActivity(`Gagal mining: ${response.data.message}`);
-            }
+            console.log(`✅ Mining berhasil!`);
         } catch (error) {
-            console.log(`⚠️ Error: ${error.message}`);
-            logActivity(`Error: ${error.message}`);
+            console.log(`❌ Gagal mining: ${error.response ? error.response.status : error.message}`);
         }
 
-        // Tunggu sebelum mencoba lagi (1 menit)
-        await new Promise(resolve => setTimeout(resolve, 60000));
+        console.log('⏳ Menunggu sebelum mining berikutnya...');
+        await new Promise(resolve => setTimeout(resolve, 60000)); // Delay 60 detik
     }
 }
 
-// Jalankan bot
-startMining();
+// Mulai program dengan meminta input token
+rl.question('🔑 Masukkan token Bearer: ', async (token) => {
+    console.log('🔍 Mengambil total poin...');
+    const points = await getTotalPoints(token);
+    console.log(`💰 Total Poin: ${points}`);
+
+    // Memulai auto mining
+    await startAutoMining(token);
+});
