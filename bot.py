@@ -2,92 +2,89 @@ import requests
 import time
 import os
 
-# Warna untuk tampilan
-RED = "\033[91m"
-GREEN = "\033[92m"
-CYAN = "\033[96m"
-RESET = "\033[0m"
+# Branding dan Menu Awal
+def show_menu():
+    os.system('clear' if os.name == 'posix' else 'cls')
+    print("""
+██████╗ ███████╗██╗  ██╗██╗██╗     ███╗   ██╗███╗   ██╗███████╗███████╗
+██╔══██╗██╔════╝██║ ██╔╝██║██║     ████╗  ██║████╗  ██║██╔════╝██╔════╝
+██║  ██║█████╗  █████╔╝ ██║██║     ██╔██╗ ██║██╔██╗ ██║███████╗█████╗  
+██║  ██║██╔══╝  ██╔═██╗ ██║██║     ██║╚██╗██║██║╚██╗██║╚════██║██╔══╝  
+██████╔╝███████╗██║  ██╗██║███████╗██║ ╚████║██║ ╚████║███████║███████╗
+╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚══════╝
+                                                                     
+       🚀 Auto Mining Bot - rzkilmnss 🚀
+    """)
+    print("1. Mulai Auto Mining")
+    print("2. Keluar")
+    choice = input("Pilih opsi (1/2): ")
+    return choice
 
-# Fungsi untuk membersihkan layar
-def clear_screen():
-    os.system("cls" if os.name == "nt" else "clear")
-
-# Fungsi untuk menampilkan banner ASCII keren
-def show_banner():
-    clear_screen()
-    print(CYAN + """
-██████╗ ███████╗██╗  ██╗██╗██╗     ███╗   ███╗███╗   ██╗███████╗███████╗
-██╔══██╗██╔════╝██║  ██║██║██║     ████╗ ████║████╗  ██║██╔════╝██╔════╝
-██║  ██║█████╗  ███████║██║██║     ██╔████╔██║██╔██╗ ██║███████╗█████╗  
-██║  ██║██╔══╝  ██╔══██║██║██║     ██║╚██╔╝██║██║╚██╗██║╚════██║██╔══╝  
-██████╔╝███████╗██║  ██║██║███████╗██║ ╚═╝ ██║██║ ╚████║███████║███████╗
-╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
-    """ + RESET)
-
-# Fungsi untuk input token dari pengguna
+# Input Token
 def get_token():
-    token = input("🔑 Masukkan Token Bearer: ")
-    return token
+    return input("\n🔑 Masukkan Token Bearer Anda: ")
 
-# Fungsi untuk mengambil total poin
+# Konfigurasi API
+BASE_URL = "https://api.dawn.org"
+
+ENDPOINTS = {
+    "points": f"{BASE_URL}/user/points",
+    "mine_start": f"{BASE_URL}/mine/start",
+    "mine_status": f"{BASE_URL}/mine/status",
+}
+
+# Fungsi mengambil total poin
 def get_points(token):
-    url = "https://api.dawn.org/user/points"
-    headers = {"Authorization": f"Bearer {token}"}
-
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(ENDPOINTS["points"], headers={"Authorization": f"Bearer {token}"})
         if response.status_code == 200:
-            data = response.json()
-            return data.get("points", 0)
+            return response.json().get("points", "Tidak ditemukan")
         else:
-            print(f"❌ Gagal mengambil poin: {response.status_code}")
+            print(f"⚠️ Error saat mengambil poin: {response.text}")
             return None
     except Exception as e:
         print(f"⚠️ Error saat mengambil poin: {e}")
         return None
 
-# Fungsi untuk memulai mining
+# Fungsi memulai mining
 def start_mining(token):
-    url = "https://api.dawn.org/mine/start"
-    headers = {"Authorization": f"Bearer {token}"}
-
     try:
-        response = requests.post(url, headers=headers)
+        response = requests.post(ENDPOINTS["mine_start"], headers={"Authorization": f"Bearer {token}"})
         if response.status_code == 200:
-            print(GREEN + "✅ Mining berhasil!" + RESET)
+            return True
         else:
-            print(RED + f"❌ Gagal mining: {response.status_code}" + RESET)
+            print(f"⚠️ Error saat mining: {response.text}")
+            return False
     except Exception as e:
         print(f"⚠️ Error saat mining: {e}")
+        return False
 
-# Fungsi menu utama
-def main_menu():
-    while True:
-        show_banner()
-        print("1️⃣  Mulai Auto Mining")
-        print("2️⃣  Keluar")
-        choice = input("\nPilih menu: ")
-
-        if choice == "1":
-            token = get_token()
-            start_bot(token)
-        elif choice == "2":
-            print("👋 Keluar dari bot. Sampai jumpa!")
-            break
-        else:
-            print("⚠️ Pilihan tidak valid, coba lagi!")
-
-# Fungsi untuk menjalankan bot mining
-def start_bot(token):
-    print("\n⚡ Bot auto mining dimulai...\n")
+# Fungsi utama menjalankan auto mining
+def auto_mining(token):
     while True:
         points = get_points(token)
         if points is not None:
-            print(f"💰 Total Poin: {points}")
+            print(f"\n💰 Total Poin: {points}")
 
-        start_mining(token)
+        print("⚡ Bot auto mining dimulai...")
+        success = start_mining(token)
+        
+        if success:
+            print("✅ Mining berhasil!")
+        else:
+            print("❌ Mining gagal, mencoba lagi nanti...")
+
         print("⏳ Menunggu sebelum mining berikutnya...\n")
-        time.sleep(300)  # Menunggu 5 menit sebelum mining ulang
+        time.sleep(60)  # Tunggu 60 detik sebelum mining ulang
 
-if __name__ == "__main__":
-    main_menu()
+# Program Utama
+while True:
+    choice = show_menu()
+    if choice == "1":
+        token = get_token()
+        auto_mining(token)
+    elif choice == "2":
+        print("🚀 Keluar dari bot. Sampai jumpa!")
+        break
+    else:
+        print("❌ Pilihan tidak valid. Coba lagi.")
